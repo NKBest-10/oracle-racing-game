@@ -59,39 +59,30 @@ const floor = new THREE.Mesh(floorGeometry, floorMaterial);
 floor.rotation.x = -Math.PI / 2;
 scene.add(floor);
 
-// Cube Character Setup
-let cubeCharacter;
-const cubeGroup = new THREE.Group();
+// Animal Model Setup
+let mixer;
+let horseModel;
+const actions = {};
 
-function createCubeCharacter() {
-    // Body
-    const bodyGeo = new THREE.BoxGeometry(1, 1, 1);
-    const bodyMat = new THREE.MeshPhongMaterial({ color: 0x6366f1 });
-    const body = new THREE.Mesh(bodyGeo, bodyMat);
-    body.position.y = 1;
-    cubeGroup.add(body);
+const loader = new GLTFLoader();
+const MODEL_URL = 'https://raw.githubusercontent.com/mrdoob/three.js/master/examples/models/gltf/Horse.glb';
 
-    // Head
-    const headGeo = new THREE.BoxGeometry(0.6, 0.6, 0.6);
-    const headMat = new THREE.MeshPhongMaterial({ color: 0xffffff });
-    const head = new THREE.Mesh(headGeo, headMat);
-    head.position.y = 1.9;
-    cubeGroup.add(head);
+loader.load(MODEL_URL, (gltf) => {
+    horseModel = gltf.scene;
+    horseModel.scale.set(0.012, 0.012, 0.012);
+    horseModel.position.set(0, 0, 0);
+    scene.add(horseModel);
 
-    // Eyes
-    const eyeGeo = new THREE.BoxGeometry(0.1, 0.1, 0.1);
-    const eyeMat = new THREE.MeshBasicMaterial({ color: 0x000000 });
-    const leftEye = new THREE.Mesh(eyeGeo, eyeMat);
-    leftEye.position.set(-0.15, 2, 0.3);
-    const rightEye = new THREE.Mesh(eyeGeo, eyeMat);
-    rightEye.position.set(0.15, 2, 0.3);
-    cubeGroup.add(leftEye, rightEye);
-
-    scene.add(cubeGroup);
-    return cubeGroup;
-}
-
-cubeCharacter = createCubeCharacter();
+    // Setup Animations
+    mixer = new THREE.AnimationMixer(horseModel);
+    const clip = gltf.animations[0];
+    const action = mixer.clipAction(clip);
+    actions['run'] = action;
+    action.play();
+    action.paused = true; // Pause at start
+}, undefined, (error) => {
+    console.error('Error loading horse model:', error);
+});
 
 // Window resize handler
 window.addEventListener('resize', () => {
@@ -104,27 +95,20 @@ window.addEventListener('resize', () => {
 const clock = new THREE.Clock();
 function animate() {
     requestAnimationFrame(animate);
-    const time = clock.getElapsedTime();
     const dt = clock.getDelta();
 
-    // Cube Animation logic
-    if (isRacing) {
-        if (Date.now() - lastSpacePress < 300) {
-            // Running: Jump and wiggle
-            cubeGroup.position.y = Math.abs(Math.sin(time * 15)) * 0.5;
-            cubeGroup.rotation.z = Math.sin(time * 15) * 0.1;
+    if (mixer) {
+        mixer.update(dt);
 
+        // Animal Animation logic
+        if (isRacing && (Date.now() - lastSpacePress < 300)) {
+            actions['run'].paused = false;
             // Move grid texture to simulate running effect
-            grid.position.z += 8 * dt;
+            grid.position.z += 12 * dt;
             if (grid.position.z > 5) grid.position.z = 0;
         } else {
-            // Idle: Gentle hover
-            cubeGroup.position.y = Math.sin(time * 2) * 0.1;
-            cubeGroup.rotation.z = 0;
+            actions['run'].paused = true;
         }
-    } else {
-        // Not racing: Idle
-        cubeGroup.position.y = Math.sin(time * 2) * 0.1;
     }
 
     controls.update();
@@ -232,9 +216,11 @@ function handleSpacePress() {
     }
 }
 
-isRacing = false;
-document.getElementById('winner-name').textContent = '🏆 ' + winnerName + ' WINS!';
-document.getElementById('victory-modal').classList.remove('hidden');
+function handleGameOver(winnerName) {
+    isRacing = false;
+    document.getElementById('winner-name').textContent = '🏆 ' + winnerName + ' WINS!';
+    document.getElementById('victory-modal').classList.remove('hidden');
+}
 
 // ==========================================
 // UI EVENTS
