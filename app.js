@@ -203,80 +203,93 @@ animate();
 // MQTT & NETWORK LOGIC
 // ==========================================
 console.log("MQTT Initializing...");
-if (typeof mqtt === 'undefined') {
-    console.error("MQTT library NOT loaded!");
-    document.getElementById('hof-name').textContent = "Error: MQTT Library Missing";
-}
-
-const client = mqtt.connect(MQTT_BROKER);
-
-// Connection Timeout Fallback
+let client = null;
 let mqttConnected = false;
-setTimeout(() => {
-    if (!mqttConnected) {
-        console.error("MQTT Connection Timeout (5s)");
-        const titleEl = document.getElementById('hof-name');
-        if (titleEl) titleEl.textContent = '❌ ชะงัก: เชื่อมโยงสนามประลองไม่สำเร็จ (MQTT Error)';
 
-        const statusEl = document.getElementById('connection-status');
-        if (statusEl) {
-            statusEl.textContent = '🔴 ออฟไลน์';
-            statusEl.className = 'status-badge offline';
-        }
-    }
-}, 5000);
-
-client.on('connect', () => {
-    mqttConnected = true;
-    console.log("MQTT Connected!");
+if (typeof mqtt === 'undefined') {
+    console.error("MQTT library NOT loaded! Playing in OFFLINE mode.");
+    document.getElementById('hof-name').textContent = "⚠️ เล่นโหมดออฟไลน์ (MQTT Missing)";
     const statusEl = document.getElementById('connection-status');
     if (statusEl) {
-        statusEl.textContent = '🟢 ออนไลน์';
-        statusEl.className = 'status-badge connected';
-    } else {
-        console.warn("Element 'connection-status' not found");
+        statusEl.textContent = '🔴 ออฟไลน์';
+        statusEl.className = 'status-badge offline';
     }
+} else {
+    try {
+        client = mqtt.connect(MQTT_BROKER);
 
-    client.subscribe(TOPIC_POS + '+');
-    client.subscribe(TOPIC_HOF);
-});
+        // Connection Timeout Fallback
+        setTimeout(() => {
+            if (!mqttConnected) {
+                console.error("MQTT Connection Timeout (5s)");
+                const titleEl = document.getElementById('hof-name');
+                if (titleEl) titleEl.textContent = '❌ ชะงัก: เชื่อมโยงสนามประลองไม่สำเร็จ (ออฟไลน์)';
 
-client.on('message', (topic, message) => {
-    const payload = message.toString();
-
-    // 1. Hall of Fame Update
-    if (topic === TOPIC_HOF) {
-        document.getElementById('hof-name').textContent = payload;
-        return;
-    }
-
-    // 2. Position Updates
-    if (topic.startsWith(TOPIC_POS)) {
-        const player = topic.split('/').pop();
-        try {
-            const data = JSON.parse(payload);
-            const score = data.score;
-            const animal = data.animal || 'horse';
-
-            if (player !== myName) {
-                opponents[player] = { score, animal };
-                updateTracks();
-
-                // Checking if opponent won
-                if (score >= WIN_SCORE && isRacing) {
-                    handleGameOver(player);
+                const statusEl = document.getElementById('connection-status');
+                if (statusEl) {
+                    statusEl.textContent = '🔴 ออฟไลน์';
+                    statusEl.className = 'status-badge offline';
                 }
             }
-        } catch (e) {
-            // Fallback for old simple payloads
-            const score = parseInt(payload, 10);
-            if (player !== myName) {
-                opponents[player] = { score, animal: 'horse' };
-                updateTracks();
+        }, 5000);
+
+        client.on('connect', () => {
+            mqttConnected = true;
+            console.log("MQTT Connected!");
+            const statusEl = document.getElementById('connection-status');
+            if (statusEl) {
+                statusEl.textContent = '🟢 ออนไลน์';
+                statusEl.className = 'status-badge connected';
             }
-        }
+            client.subscribe(TOPIC_POS + '+');
+            client.subscribe(TOPIC_HOF);
+        });
+
+
+        client.on('error', (err) => {
+            console.error('MQTT Connection Error:', err);
+        });
+
+        client.on('message', (topic, message) => {
+            const payload = message.toString();
+
+            // 1. Hall of Fame Update
+            if (topic === TOPIC_HOF) {
+                document.getElementById('hof-name').textContent = payload;
+                return;
+            }
+
+            // 2. Position Updates
+            if (topic.startsWith(TOPIC_POS)) {
+                const player = topic.split('/').pop();
+                try {
+                    const data = JSON.parse(payload);
+                    const score = data.score;
+                    const animal = data.animal || 'horse';
+
+                    if (player !== myName) {
+                        opponents[player] = { score, animal };
+                        updateTracks();
+
+                        // Checking if opponent won
+                        if (score >= WIN_SCORE && isRacing) {
+                            handleGameOver(player);
+                        }
+                    }
+                } catch (e) {
+                    // Fallback for old simple payloads
+                    const score = parseInt(payload, 10);
+                    if (player !== myName) {
+                        opponents[player] = { score, animal: 'horse' };
+                        updateTracks();
+                    }
+                }
+            }
+        });
+    } catch (e) {
+        console.error("Failed to setup MQTT:", e);
     }
-});
+}
 
 // ==========================================
 // GAMEPLAY LOGIC 
@@ -334,16 +347,18 @@ function handleSpacePress() {
     lastSpacePress = Date.now();
 
     // Send update to others with animal type
-    client.publish(TOPIC_POS + myName, JSON.stringify({
-        score: myProgress,
-        animal: selectedAnimal
-    }));
+    if (client && mqttConnected) {
+        client.publish(TOPIC_POS + myName, JSON.stringify({
+            score: myProgress,
+            animal: selectedAnimal
+        }));
+    }
     updateTracks();
 
     // Did I win?
     if (myProgress >= WIN_SCORE) {
         handleGameOver(myName);
-        client.publish(TOPIC_HOF, myName, { retain: true });
+        if (client && mqttConnected) client.publish(TOPIC_HOF, myName, { retain: true });
     }
 }
 
@@ -372,10 +387,12 @@ document.getElementById('join-btn').addEventListener('click', () => {
     document.getElementById('victory-modal').classList.add('hidden');
 
     // Announce start pos
-    client.publish(TOPIC_POS + myName, JSON.stringify({
-        score: 0,
-        animal: selectedAnimal
-    }));
+    if (client && mqttConnected) {
+        client.publish(TOPIC_POS + myName, JSON.stringify({
+            score: 0,
+            animal: selectedAnimal
+        }));
+    }
     updateTracks();
 });
 
