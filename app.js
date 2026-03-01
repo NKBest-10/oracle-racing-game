@@ -7,8 +7,8 @@ console.log("🚀 Oracle Racing 4.0: Script Loading...");
 // ==========================================
 // GAME CONFIG & STATE
 // ==========================================
-const MQTT_BROKER = 'wss://broker.hivemq.com:8000/mqtt';
-const TOPIC_BASE = 'oracle-racer/';
+const MQTT_BROKER = 'wss://dustboy-wss-bridge.laris.workers.dev/mqtt';
+const TOPIC_BASE = 'oracle/race/';
 const TOPIC_POS = TOPIC_BASE + 'pos/';
 const TOPIC_HOF = TOPIC_BASE + 'hof';
 const WIN_SCORE = 100;
@@ -189,7 +189,24 @@ if (typeof mqtt === 'undefined') {
 
 const client = mqtt.connect(MQTT_BROKER);
 
+// Connection Timeout Fallback
+let mqttConnected = false;
+setTimeout(() => {
+    if (!mqttConnected) {
+        console.error("MQTT Connection Timeout (5s)");
+        const titleEl = document.getElementById('hof-name');
+        if (titleEl) titleEl.textContent = '❌ ชะงัก: เชื่อมโยงสนามประลองไม่สำเร็จ (MQTT Error)';
+
+        const statusEl = document.getElementById('connection-status');
+        if (statusEl) {
+            statusEl.textContent = '🔴 ออฟไลน์';
+            statusEl.className = 'status-badge offline';
+        }
+    }
+}, 5000);
+
 client.on('connect', () => {
+    mqttConnected = true;
     console.log("MQTT Connected!");
     const statusEl = document.getElementById('connection-status');
     if (statusEl) {
