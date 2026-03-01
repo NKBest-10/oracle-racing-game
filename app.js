@@ -65,9 +65,10 @@ let horseModel;
 const actions = {};
 
 const loader = new GLTFLoader();
-const MODEL_URL = 'https://raw.githubusercontent.com/mrdoob/three.js/master/examples/models/gltf/Horse.glb';
+const MODEL_URL = 'https://cdn.jsdelivr.net/gh/mrdoob/three.js@master/examples/models/gltf/Horse.glb';
 
 loader.load(MODEL_URL, (gltf) => {
+    console.log('Horse model loaded successfully');
     horseModel = gltf.scene;
     horseModel.scale.set(0.012, 0.012, 0.012);
     horseModel.position.set(0, 0, 0);
@@ -80,8 +81,15 @@ loader.load(MODEL_URL, (gltf) => {
     actions['run'] = action;
     action.play();
     action.paused = true; // Pause at start
-}, undefined, (error) => {
+
+    // UI Feedback
+    document.getElementById('hof-name').textContent = 'พร้อมซิ่งแล้ว!';
+}, (xhr) => {
+    const percent = (xhr.loaded / xhr.total) * 100;
+    console.log(`Loading model: ${Math.round(percent)}%`);
+}, (error) => {
     console.error('Error loading horse model:', error);
+    document.getElementById('hof-name').textContent = 'โหลดโมเดลไม่สำเร็จ กรุณารีเฟรช';
 });
 
 // Window resize handler
