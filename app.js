@@ -59,46 +59,39 @@ const floor = new THREE.Mesh(floorGeometry, floorMaterial);
 floor.rotation.x = -Math.PI / 2;
 scene.add(floor);
 
-// Model Loader
-let mixer;
-let actions = {};
-let activeAction;
-let robotModel;
+// Cube Character Setup
+let cubeCharacter;
+const cubeGroup = new THREE.Group();
 
-const loader = new GLTFLoader();
-const MODEL_URL = 'https://cdn.jsdelivr.net/gh/mrdoob/three.js@master/examples/models/gltf/RobotExpressive/RobotExpressive.glb';
+function createCubeCharacter() {
+    // Body
+    const bodyGeo = new THREE.BoxGeometry(1, 1, 1);
+    const bodyMat = new THREE.MeshPhongMaterial({ color: 0x6366f1 });
+    const body = new THREE.Mesh(bodyGeo, bodyMat);
+    body.position.y = 1;
+    cubeGroup.add(body);
 
-loader.load(MODEL_URL, (gltf) => {
-    robotModel = gltf.scene;
-    robotModel.position.set(0, 0, 0);
-    // Face the camera
-    robotModel.rotation.y = 0;
-    scene.add(robotModel);
+    // Head
+    const headGeo = new THREE.BoxGeometry(0.6, 0.6, 0.6);
+    const headMat = new THREE.MeshPhongMaterial({ color: 0xffffff });
+    const head = new THREE.Mesh(headGeo, headMat);
+    head.position.y = 1.9;
+    cubeGroup.add(head);
 
-    // Setup Animations
-    mixer = new THREE.AnimationMixer(robotModel);
-    const animations = gltf.animations;
+    // Eyes
+    const eyeGeo = new THREE.BoxGeometry(0.1, 0.1, 0.1);
+    const eyeMat = new THREE.MeshBasicMaterial({ color: 0x000000 });
+    const leftEye = new THREE.Mesh(eyeGeo, eyeMat);
+    leftEye.position.set(-0.15, 2, 0.3);
+    const rightEye = new THREE.Mesh(eyeGeo, eyeMat);
+    rightEye.position.set(0.15, 2, 0.3);
+    cubeGroup.add(leftEye, rightEye);
 
-    for (let i = 0; i < animations.length; i++) {
-        const clip = animations[i];
-        const action = mixer.clipAction(clip);
-        actions[clip.name] = action;
-    }
-
-    // Start Idle
-    activeAction = actions['Idle'];
-    activeAction.play();
-}, undefined, (error) => {
-    console.error('Error loading model:', error);
-});
-
-function fadeToAction(name, duration = 0.2) {
-    if (!actions[name] || activeAction === actions[name]) return;
-    const previousAction = activeAction;
-    activeAction = actions[name];
-    previousAction.fadeOut(duration);
-    activeAction.reset().setEffectiveTimeScale(1).setEffectiveWeight(1).fadeIn(duration).play();
+    scene.add(cubeGroup);
+    return cubeGroup;
 }
+
+cubeCharacter = createCubeCharacter();
 
 // Window resize handler
 window.addEventListener('resize', () => {
@@ -111,21 +104,27 @@ window.addEventListener('resize', () => {
 const clock = new THREE.Clock();
 function animate() {
     requestAnimationFrame(animate);
+    const time = clock.getElapsedTime();
     const dt = clock.getDelta();
 
-    if (mixer) mixer.update(dt);
+    // Cube Animation logic
+    if (isRacing) {
+        if (Date.now() - lastSpacePress < 300) {
+            // Running: Jump and wiggle
+            cubeGroup.position.y = Math.abs(Math.sin(time * 15)) * 0.5;
+            cubeGroup.rotation.z = Math.sin(time * 15) * 0.1;
 
-    // Anim logic: if racing but haven't pressed space recently, go back to idle
-    if (isRacing && activeAction === actions['Running']) {
-        if (Date.now() - lastSpacePress > 300) {
-            fadeToAction('Idle');
+            // Move grid texture to simulate running effect
+            grid.position.z += 8 * dt;
+            if (grid.position.z > 5) grid.position.z = 0;
+        } else {
+            // Idle: Gentle hover
+            cubeGroup.position.y = Math.sin(time * 2) * 0.1;
+            cubeGroup.rotation.z = 0;
         }
-    }
-
-    // Move grid texture to simulate running effect based on progress
-    if (isRacing && activeAction === actions['Running']) {
-        grid.position.z += 10 * dt;
-        if (grid.position.z > 5) grid.position.z = 0;
+    } else {
+        // Not racing: Idle
+        cubeGroup.position.y = Math.sin(time * 2) * 0.1;
     }
 
     controls.update();
@@ -219,7 +218,7 @@ function handleSpacePress() {
     if (myProgress > WIN_SCORE) myProgress = WIN_SCORE;
 
     lastSpacePress = Date.now();
-    fadeToAction('Running', 0.1);
+    // Animation handled in animate() loop based on lastSpacePress
 
     // Send update to others
     client.publish(TOPIC_POS + myName, myProgress.toString());
@@ -230,18 +229,12 @@ function handleSpacePress() {
         handleGameOver(myName);
         // Write to HOF with retain!
         client.publish(TOPIC_HOF, myName, { retain: true });
-        fadeToAction('Dance'); // Celebration animation
     }
 }
 
-function handleGameOver(winnerName) {
-    isRacing = false;
-    document.getElementById('winner-name').textContent = '🏆 ' + winnerName + ' WINS!';
-    document.getElementById('victory-modal').classList.remove('hidden');
-    if (winnerName !== myName) {
-        fadeToAction('Idle'); // If we lost
-    }
-}
+isRacing = false;
+document.getElementById('winner-name').textContent = '🏆 ' + winnerName + ' WINS!';
+document.getElementById('victory-modal').classList.remove('hidden');
 
 // ==========================================
 // UI EVENTS
@@ -264,7 +257,6 @@ document.getElementById('join-btn').addEventListener('click', () => {
     // Announce start pos
     client.publish(TOPIC_POS + myName, "0");
     updateTracks();
-    fadeToAction('Idle');
 });
 
 document.getElementById('restart-btn').addEventListener('click', () => {
