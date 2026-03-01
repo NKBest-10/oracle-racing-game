@@ -6,6 +6,22 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Oracle Racing | Real-time MQTT Game</title>
     <link rel="stylesheet" href="style.css">
+
+    <!-- On-Screen Error Logger (Debug) -->
+    <script>
+        window.addEventListener('error', function (event) {
+            const el = document.getElementById('hof-name');
+            const msg = event.message || (event.target && event.target.src ? 'Load Error: ' + event.target.src : 'Unknown Error');
+            if (el) el.innerHTML = `<span style='color:red;font-size:0.75rem'>ERR: ${msg}</span>`;
+            console.error("Global Error Caught:", event);
+        }, true);
+        window.addEventListener('unhandledrejection', function (event) {
+            const el = document.getElementById('hof-name');
+            if (el) el.innerHTML = `<span style='color:red;font-size:0.75rem'>PROMISE ERR: ${event.reason}</span>`;
+            console.error("Unhandled Rejection Caught:", event.reason);
+        });
+    </script>
+
     <!-- MQTT.js library -->
     <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;700&family=Kanit:wght@400;700&display=swap"
