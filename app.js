@@ -71,35 +71,77 @@ console.log("Fallback cube added to scene");
 
 // Animal Model Setup
 let mixer;
-let horseModel;
+let playerModel;
+let selectedAnimal = 'horse';
 const actions = {};
 
+const ANIMAL_CONFIG = {
+    horse: {
+        url: 'https://cdn.jsdelivr.net/gh/mrdoob/three.js@master/examples/models/gltf/Horse.glb',
+        scale: 0.012,
+        y: 0
+    },
+    flamingo: {
+        url: 'https://cdn.jsdelivr.net/gh/mrdoob/three.js@master/examples/models/gltf/Flamingo.glb',
+        scale: 0.015,
+        y: 3
+    },
+    stork: {
+        url: 'https://cdn.jsdelivr.net/gh/mrdoob/three.js@master/examples/models/gltf/Stork.glb',
+        scale: 0.015,
+        y: 3
+    },
+    parrot: {
+        url: 'https://cdn.jsdelivr.net/gh/mrdoob/three.js@master/examples/models/gltf/Parrot.glb',
+        scale: 0.015,
+        y: 3
+    }
+};
+
 const loader = new GLTFLoader();
-const MODEL_URL = 'https://cdn.jsdelivr.net/gh/mrdoob/three.js@master/examples/models/gltf/Horse.glb';
 
-loader.load(MODEL_URL, (gltf) => {
-    console.log('Horse model loaded successfully');
-    horseModel = gltf.scene;
-    horseModel.scale.set(0.012, 0.012, 0.012);
-    horseModel.position.set(0, 0, 0);
-    scene.add(horseModel);
+function loadAnimal(animalType) {
+    if (playerModel) scene.remove(playerModel);
+    if (mixer) mixer.stopAllAction();
 
-    // Setup Animations
-    mixer = new THREE.AnimationMixer(horseModel);
-    const clip = gltf.animations[0];
-    const action = mixer.clipAction(clip);
-    actions['run'] = action;
-    action.play();
-    action.paused = true; // Pause at start
+    const config = ANIMAL_CONFIG[animalType];
+    loader.load(config.url, (gltf) => {
+        console.log(`${animalType} model loaded successfully`);
+        playerModel = gltf.scene;
+        playerModel.scale.set(config.scale, config.scale, config.scale);
+        playerModel.position.set(0, config.y, 0);
+        scene.add(playerModel);
 
-    // UI Feedback
-    document.getElementById('hof-name').textContent = 'พร้อมซิ่งแล้ว!';
-}, (xhr) => {
-    const percent = (xhr.loaded / xhr.total) * 100;
-    console.log(`Loading model: ${Math.round(percent)}%`);
-}, (error) => {
-    console.error('Error loading horse model:', error);
-    document.getElementById('hof-name').textContent = 'โหลดโมเดลไม่สำเร็จ กรุณารีเฟรช';
+        if (fallbackCube) scene.remove(fallbackCube);
+
+        mixer = new THREE.AnimationMixer(playerModel);
+        const clip = gltf.animations[0];
+        const action = mixer.clipAction(clip);
+        actions['run'] = action;
+        action.play();
+        action.paused = true;
+
+        document.getElementById('hof-name').textContent = 'พร้อมซิ่งแล้ว!';
+    }, (xhr) => {
+        const percent = (xhr.loaded / xhr.total) * 100;
+        console.log(`Loading ${animalType}: ${Math.round(percent)}%`);
+    }, (error) => {
+        console.error(`Error loading ${animalType}:`, error);
+        document.getElementById('hof-name').textContent = 'โหลดโมเดลไม่สำเร็จ';
+    });
+}
+
+// Initial load
+loadAnimal('horse');
+
+// UI Selection Logic
+document.querySelectorAll('.animal-option').forEach(option => {
+    option.addEventListener('click', () => {
+        document.querySelectorAll('.animal-option').forEach(opt => opt.classList.remove('selected'));
+        option.classList.add('selected');
+        selectedAnimal = option.dataset.animal;
+        loadAnimal(selectedAnimal);
+    });
 });
 
 // Window resize handler
@@ -162,15 +204,26 @@ client.on('message', (topic, message) => {
     // 2. Position Updates
     if (topic.startsWith(TOPIC_POS)) {
         const player = topic.split('/').pop();
-        const score = parseInt(payload, 10);
+        try {
+            const data = JSON.parse(payload);
+            const score = data.score;
+            const animal = data.animal || 'horse';
 
-        if (player !== myName) {
-            opponents[player] = score;
-            updateTracks();
+            if (player !== myName) {
+                opponents[player] = { score, animal };
+                updateTracks();
 
-            // Checking if opponent won
-            if (score >= WIN_SCORE && isRacing) {
-                handleGameOver(player);
+                // Checking if opponent won
+                if (score >= WIN_SCORE && isRacing) {
+                    handleGameOver(player);
+                }
+            }
+        } catch (e) {
+            // Fallback for old simple payloads
+            const score = parseInt(payload, 10);
+            if (player !== myName) {
+                opponents[player] = { score, animal: 'horse' };
+                updateTracks();
             }
         }
     }
@@ -180,14 +233,21 @@ client.on('message', (topic, message) => {
 // GAMEPLAY LOGIC 
 // ==========================================
 
+const EMOJI_MAP = {
+    horse: '🐎',
+    flamingo: '🦩',
+    stork: '🦢',
+    parrot: '🦜'
+};
+
 function updateTracks() {
     const container = document.getElementById('tracks-container');
     container.innerHTML = '';
 
     // Create an array to sort by score (highest on top)
-    const racers = [{ name: myName, score: myProgress, isMe: true }];
-    for (const [name, score] of Object.entries(opponents)) {
-        racers.push({ name, score, isMe: false });
+    const racers = [{ name: myName, score: myProgress, animal: selectedAnimal, isMe: true }];
+    for (const [name, data] of Object.entries(opponents)) {
+        racers.push({ name, score: data.score, animal: data.animal, isMe: false });
     }
 
     // Keep top 5 or just show all
@@ -206,7 +266,9 @@ function updateTracks() {
         const marker = document.createElement('div');
         marker.className = 'track-racer';
         marker.style.left = perc + '%';
-        marker.textContent = r.name + (r.isMe ? ' (You)' : '');
+
+        const emoji = EMOJI_MAP[r.animal] || '❓';
+        marker.textContent = `${emoji} ${r.name}${r.isMe ? ' (You)' : ''}`;
 
         lane.appendChild(progress);
         lane.appendChild(marker);
@@ -221,16 +283,17 @@ function handleSpacePress() {
     if (myProgress > WIN_SCORE) myProgress = WIN_SCORE;
 
     lastSpacePress = Date.now();
-    // Animation handled in animate() loop based on lastSpacePress
 
-    // Send update to others
-    client.publish(TOPIC_POS + myName, myProgress.toString());
+    // Send update to others with animal type
+    client.publish(TOPIC_POS + myName, JSON.stringify({
+        score: myProgress,
+        animal: selectedAnimal
+    }));
     updateTracks();
 
     // Did I win?
     if (myProgress >= WIN_SCORE) {
         handleGameOver(myName);
-        // Write to HOF with retain!
         client.publish(TOPIC_HOF, myName, { retain: true });
     }
 }
@@ -260,7 +323,10 @@ document.getElementById('join-btn').addEventListener('click', () => {
     document.getElementById('victory-modal').classList.add('hidden');
 
     // Announce start pos
-    client.publish(TOPIC_POS + myName, "0");
+    client.publish(TOPIC_POS + myName, JSON.stringify({
+        score: 0,
+        animal: selectedAnimal
+    }));
     updateTracks();
 });
 
