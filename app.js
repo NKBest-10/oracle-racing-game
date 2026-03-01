@@ -14,6 +14,8 @@ let myProgress = 0;
 let isRacing = false;
 let opponents = {}; // { username: score }
 let lastSpacePress = 0;
+let raceStartTime = 0;
+let timerInterval = null;
 
 // ==========================================
 // 3D GRAPHICS SETUP (Three.js)
@@ -101,6 +103,11 @@ const ANIMAL_CONFIG = {
         url: 'https://cdn.jsdelivr.net/gh/mrdoob/three.js@master/examples/models/gltf/Parrot.glb',
         scale: 0.015,
         y: 3
+    },
+    monkey: {
+        url: 'https://cdn.jsdelivr.net/gh/mrdoob/three.js@master/examples/models/gltf/Horse.glb', // Fallback to Horse structure for Monkey if no model exists
+        scale: 0.01,
+        y: 0
     }
 };
 
@@ -295,7 +302,8 @@ const EMOJI_MAP = {
     horse: '🐎',
     flamingo: '🦩',
     stork: '🦢',
-    parrot: '🦜'
+    parrot: '🦜',
+    monkey: '🐒'
 };
 
 function updateTracks() {
@@ -360,6 +368,7 @@ function handleSpacePress() {
 
 function handleGameOver(winnerName) {
     isRacing = false;
+    clearInterval(timerInterval);
     document.getElementById('winner-name').textContent = '🏆 ' + winnerName + ' WINS!';
     document.getElementById('victory-modal').classList.remove('hidden');
 }
@@ -390,14 +399,37 @@ document.getElementById('join-btn').addEventListener('click', () => {
         }));
     }
     updateTracks();
+
+    // Start Timer
+    const timerEl = document.getElementById('timer-display');
+    if (timerEl) {
+        timerEl.style.display = 'block';
+        timerEl.textContent = '0.00s';
+    }
+    raceStartTime = Date.now();
+    clearInterval(timerInterval);
+    timerInterval = setInterval(() => {
+        if (!isRacing || !timerEl) return;
+        const elapsed = (Date.now() - raceStartTime) / 1000;
+        timerEl.textContent = elapsed.toFixed(2) + 's';
+    }, 50);
 });
 
 document.getElementById('restart-btn').addEventListener('click', () => {
     // Hide race, show login again
     document.getElementById('race-screen').classList.add('hidden');
     document.getElementById('login-screen').classList.remove('hidden');
+
+    // Require name on restart
+    const nameInput = document.getElementById('player-name');
+    nameInput.value = '';
+    nameInput.focus();
+
     isRacing = false;
     myProgress = 0;
+
+    const timerEl = document.getElementById('timer-display');
+    if (timerEl) timerEl.style.display = 'none';
 });
 
 window.addEventListener('keydown', (e) => {

@@ -64,6 +64,10 @@
                             <span class="animal-emoji">🦜</span>
                             <span class="animal-label">นกแก้ว</span>
                         </div>
+                        <div class="animal-option" data-animal="monkey">
+                            <span class="animal-emoji">🐒</span>
+                            <span class="animal-label">ลิง</span>
+                        </div>
                     </div>
 
                     <button id="join-btn">เข้าสู่ลู่วิ่ง</button>
@@ -82,6 +86,9 @@
         <div id="race-screen" class="screen hidden">
             <div class="top-hud">
                 <div class="instruction">กด <kbd>SPACEBAR</kbd> รัวๆ เพื่อวิ่ง!</div>
+                <div id="timer-display" class="status-badge"
+                    style="background: rgba(255,255,255,0.1); color: #fff; border: 1px solid rgba(255,255,255,0.3); font-size: 1.2rem; min-width: 100px; text-align: center; display: none;">
+                    00:00.00</div>
                 <div id="connection-status" class="status-badge connecting">กำลังเชื่อมต่อ...</div>
             </div>
 
