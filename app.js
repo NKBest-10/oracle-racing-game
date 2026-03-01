@@ -23,53 +23,61 @@ let lastSpacePress = 0;
 // 3D GRAPHICS SETUP (Three.js)
 // ==========================================
 const canvas = document.getElementById('game-canvas');
-const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x111827); // Dark theme
-scene.fog = new THREE.Fog(0x111827, 20, 100);
+let scene, camera, renderer, controls, grid, fallbackCube;
 
-const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
-camera.position.set(0, 4, 15);
-camera.lookAt(0, 2, 0);
+try {
+    scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x111827); // Dark theme
+    scene.fog = new THREE.Fog(0x111827, 20, 100);
 
-const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.setPixelRatio(window.devicePixelRatio);
-canvas.appendChild(renderer.domElement);
+    camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+    camera.position.set(0, 4, 15);
+    camera.lookAt(0, 2, 0);
 
-const controls = new OrbitControls(camera, renderer.domElement);
-controls.target.set(0, 2, 0);
-controls.update();
+    renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(window.devicePixelRatio);
+    canvas.appendChild(renderer.domElement);
 
-// Lighting
-const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444);
-hemiLight.position.set(0, 20, 0);
-scene.add(hemiLight);
+    controls = new OrbitControls(camera, renderer.domElement);
+    controls.target.set(0, 2, 0);
+    controls.update();
 
-const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
-dirLight.position.set(0, 20, 10);
-scene.add(dirLight);
+    // Lighting
+    const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444);
+    hemiLight.position.set(0, 20, 0);
+    scene.add(hemiLight);
 
-console.log("Oracle Racing: Engine Starting...");
+    const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    dirLight.position.set(0, 20, 10);
+    scene.add(dirLight);
 
-// Floor Grid
-const grid = new THREE.GridHelper(200, 40, 0xffffff, 0x444444);
-grid.material.opacity = 0.2;
-grid.material.transparent = true;
-scene.add(grid);
+    console.log("Oracle Racing: 3D Engine Started");
 
-const floorGeometry = new THREE.PlaneGeometry(200, 200);
-const floorMaterial = new THREE.MeshPhongMaterial({ color: 0x1e293b, depthWrite: false });
-const floor = new THREE.Mesh(floorGeometry, floorMaterial);
-floor.rotation.x = -Math.PI / 2;
-scene.add(floor);
+    // Floor Grid
+    grid = new THREE.GridHelper(200, 40, 0xffffff, 0x444444);
+    grid.material.opacity = 0.2;
+    grid.material.transparent = true;
+    scene.add(grid);
 
-// Fallback Cube (Visible immediately)
-const fallbackGeo = new THREE.BoxGeometry(1, 1, 1);
-const fallbackMat = new THREE.MeshPhongMaterial({ color: 0xff0000 });
-const fallbackCube = new THREE.Mesh(fallbackGeo, fallbackMat);
-fallbackCube.position.y = 0.5;
-scene.add(fallbackCube);
-console.log("Fallback cube added to scene");
+    const floorGeometry = new THREE.PlaneGeometry(200, 200);
+    const floorMaterial = new THREE.MeshPhongMaterial({ color: 0x1e293b, depthWrite: false });
+    const floor = new THREE.Mesh(floorGeometry, floorMaterial);
+    floor.rotation.x = -Math.PI / 2;
+    scene.add(floor);
+
+    // Fallback Cube
+    const fallbackGeo = new THREE.BoxGeometry(1, 1, 1);
+    const fallbackMat = new THREE.MeshPhongMaterial({ color: 0xff0000 });
+    fallbackCube = new THREE.Mesh(fallbackGeo, fallbackMat);
+    fallbackCube.position.y = 0.5;
+    scene.add(fallbackCube);
+
+} catch (e) {
+    console.error("WebGL Initialization failed:", e);
+    // UI Fallback
+    canvas.innerHTML = "<div style='color:white;text-align:center;padding-top:20%;'>⚠️ 3D Render Error: กรุณาเปิด WebGL หรือเปลี่ยนเบราว์เซอร์</div>";
+}
 
 // Animal Model Setup
 let mixer;
@@ -103,6 +111,12 @@ const ANIMAL_CONFIG = {
 const loader = new GLTFLoader();
 
 function loadAnimal(animalType) {
+    if (!scene) {
+        console.warn("Scene is not initialized, skipping model loading.");
+        document.getElementById('hof-name').textContent = '⚠️ รุ่นจำลองไม่สามารถโหลดได้';
+        return;
+    }
+
     if (playerModel) scene.remove(playerModel);
     if (mixer) mixer.stopAllAction();
 
@@ -123,7 +137,10 @@ function loadAnimal(animalType) {
         action.play();
         action.paused = true;
 
-        document.getElementById('hof-name').textContent = 'พร้อมซิ่งแล้ว!';
+        const hofEl = document.getElementById('hof-name');
+        if (hofEl && hofEl.textContent === 'กำลังตรวจสอบข้อมูล...') {
+            hofEl.textContent = 'พร้อมซิ่งแล้ว!';
+        }
     }, (xhr) => {
         const percent = (xhr.loaded / xhr.total) * 100;
         console.log(`Loading ${animalType}: ${Math.round(percent)}%`);
@@ -148,9 +165,11 @@ document.querySelectorAll('.animal-option').forEach(option => {
 
 // Window resize handler
 window.addEventListener('resize', () => {
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
+    if (camera && renderer) {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+    }
 });
 
 // Render Loop
@@ -163,18 +182,20 @@ function animate() {
         mixer.update(dt);
 
         // Animal Animation logic
-        if (isRacing && (Date.now() - lastSpacePress < 300)) {
+        if (isRacing && (Date.now() - lastSpacePress < 300) && actions['run']) {
             actions['run'].paused = false;
             // Move grid texture to simulate running effect
-            grid.position.z += 12 * dt;
-            if (grid.position.z > 5) grid.position.z = 0;
-        } else {
+            if (grid) {
+                grid.position.z += 12 * dt;
+                if (grid.position.z > 5) grid.position.z = 0;
+            }
+        } else if (actions['run']) {
             actions['run'].paused = true;
         }
     }
 
-    controls.update();
-    renderer.render(scene, camera);
+    if (controls) controls.update();
+    if (renderer && scene && camera) renderer.render(scene, camera);
 }
 animate();
 
