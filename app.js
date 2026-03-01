@@ -2,6 +2,8 @@ import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.154.0/build/three.m
 import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.154.0/examples/jsm/loaders/GLTFLoader.js';
 import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.154.0/examples/jsm/controls/OrbitControls.js';
 
+console.log("🚀 Oracle Racing 4.0: Script Loading...");
+
 // ==========================================
 // GAME CONFIG & STATE
 // ==========================================
@@ -179,14 +181,23 @@ animate();
 // ==========================================
 // MQTT & NETWORK LOGIC
 // ==========================================
-// using global mqtt from CDN script in HTML
+console.log("MQTT Initializing...");
+if (typeof mqtt === 'undefined') {
+    console.error("MQTT library NOT loaded!");
+    document.getElementById('hof-name').textContent = "Error: MQTT Library Missing";
+}
+
 const client = mqtt.connect(MQTT_BROKER);
 
 client.on('connect', () => {
     console.log("MQTT Connected!");
     const statusEl = document.getElementById('connection-status');
-    statusEl.textContent = '🟢 ออนไลน์';
-    statusEl.className = 'status-badge connected';
+    if (statusEl) {
+        statusEl.textContent = '🟢 ออนไลน์';
+        statusEl.className = 'status-badge connected';
+    } else {
+        console.warn("Element 'connection-status' not found");
+    }
 
     client.subscribe(TOPIC_POS + '+');
     client.subscribe(TOPIC_HOF);
