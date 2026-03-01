@@ -47,8 +47,10 @@ const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
 dirLight.position.set(0, 20, 10);
 scene.add(dirLight);
 
+console.log("Oracle Racing: Engine Starting...");
+
 // Floor Grid
-const grid = new THREE.GridHelper(200, 40, 0x000000, 0x000000);
+const grid = new THREE.GridHelper(200, 40, 0xffffff, 0x444444);
 grid.material.opacity = 0.2;
 grid.material.transparent = true;
 scene.add(grid);
@@ -58,6 +60,14 @@ const floorMaterial = new THREE.MeshPhongMaterial({ color: 0x1e293b, depthWrite:
 const floor = new THREE.Mesh(floorGeometry, floorMaterial);
 floor.rotation.x = -Math.PI / 2;
 scene.add(floor);
+
+// Fallback Cube (Visible immediately)
+const fallbackGeo = new THREE.BoxGeometry(1, 1, 1);
+const fallbackMat = new THREE.MeshPhongMaterial({ color: 0xff0000 });
+const fallbackCube = new THREE.Mesh(fallbackGeo, fallbackMat);
+fallbackCube.position.y = 0.5;
+scene.add(fallbackCube);
+console.log("Fallback cube added to scene");
 
 // Animal Model Setup
 let mixer;
@@ -131,6 +141,7 @@ animate();
 const client = mqtt.connect(MQTT_BROKER);
 
 client.on('connect', () => {
+    console.log("MQTT Connected!");
     const statusEl = document.getElementById('connection-status');
     statusEl.textContent = '🟢 ออนไลน์';
     statusEl.className = 'status-badge connected';
