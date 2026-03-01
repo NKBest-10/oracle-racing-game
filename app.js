@@ -1,5 +1,6 @@
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.154.0/build/three.module.js';
 import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.154.0/examples/jsm/loaders/GLTFLoader.js';
+import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.154.0/examples/jsm/controls/OrbitControls.js';
 
 // ==========================================
 // GAME CONFIG & STATE
@@ -25,13 +26,17 @@ scene.background = new THREE.Color(0x111827); // Dark theme
 scene.fog = new THREE.Fog(0x111827, 20, 100);
 
 const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
-camera.position.set(0, 4, 10);
+camera.position.set(0, 4, 15);
 camera.lookAt(0, 2, 0);
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(window.devicePixelRatio);
 canvas.appendChild(renderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 2, 0);
+controls.update();
 
 // Lighting
 const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444);
@@ -123,6 +128,7 @@ function animate() {
         if (grid.position.z > 5) grid.position.z = 0;
     }
 
+    controls.update();
     renderer.render(scene, camera);
 }
 animate();
