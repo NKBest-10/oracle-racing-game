@@ -1,7 +1,3 @@
-import * as THREE from 'three';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-
 console.log("🚀 Oracle Racing 4.0: Script Loading...");
 
 // ==========================================
@@ -39,7 +35,7 @@ try {
     renderer.setPixelRatio(window.devicePixelRatio);
     canvas.appendChild(renderer.domElement);
 
-    controls = new OrbitControls(camera, renderer.domElement);
+    controls = new THREE.OrbitControls(camera, renderer.domElement);
     controls.target.set(0, 2, 0);
     controls.update();
 
@@ -108,7 +104,7 @@ const ANIMAL_CONFIG = {
     }
 };
 
-const loader = new GLTFLoader();
+const loader = new THREE.GLTFLoader();
 
 function loadAnimal(animalType) {
     if (!scene) {
